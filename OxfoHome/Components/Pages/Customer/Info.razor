@@ -1,0 +1,133 @@
+﻿@page "/customer/info/{EntityId?}"
+
+@using OxfoHome.DAL
+@using OxfoHome.DAL.DTOs
+@using OxfoHome.DAL.Services
+
+<PageTitle>@(!string.IsNullOrWhiteSpace(EntityId) ? "Edit Customer - OxfoHome" : "Add Customer - OxfoHome")</PageTitle>
+
+<BackTo Link="/customer/list" Title="Back to manage customers" />
+
+<div class="row mt-3">
+    <h3>@(!string.IsNullOrWhiteSpace(EntityId) ? "Edit Customer" : "Add Customer")</h3>
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <EditForm Model="entity" OnSubmit="OnSubmit">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+                    <div class="form-card">
+                        <div class="row">
+                            <div class="form-group col-lg-6 mt-3">
+                                <label for="name">Business Name</label>
+                                <InputText @bind-Value="entity.Name" focus class="form-control" type="text" id="name"
+                                    required />
+                            </div>
+
+                            <div class="form-group col-lg-6 mt-3">
+                                <label for="contactName">Contact Name</label>
+                                <InputText @bind-Value="entity.ContactName" focus class="form-control" type="text"
+                                    id="contactName" required />
+                            </div>
+
+                            <div class="form-group col-lg-6 mt-3">
+                                <label for="phone">Contact Phone</label>
+                                <InputText @bind-Value="entity.ContactPhone" focus class="form-control" type="text"
+                                    id="phone" />
+                            </div>
+
+                            <div class="form-group col-lg-6 mt-3">
+                                <label for="phone2">Second Phone</label>
+                                <InputText @bind-Value="entity.Phone2" focus class="form-control" type="text"
+                                    id="phone2" />
+                            </div>
+
+                            <div class="form-group col-lg-6 mt-3">
+                                <label for="email">Email</label>
+                                <InputText @bind-Value="entity.Email" focus class="form-control" type="text"
+                                    id="email" />
+                            </div>
+
+                            <div class="form-group col-lg-12 mt-3">
+                                <label for="address">Address</label>
+                                <InputText @bind-Value="entity.Address" focus class="form-control" type="text"
+                                    id="address" />
+                            </div>
+
+                            <div class="form-group col-lg-12 mt-3">
+                                <label for="notes">Notes</label>
+                                <MultilineInput @bind-Value="entity.Notes" class="form-control" id="notes" />
+                            </div>
+
+                            <div class="form-group col-lg-12 mt-3 d-flex justify-content-end">
+                                <button type="submit" class="btn btn-primary">
+                                    @(!string.IsNullOrWhiteSpace(EntityId) ? "Update Customer" : "Add Customer")
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+</div>
+
+@inject ICustomerService service
+@inject IEncryptionService encryptor
+@inject NavigationManager Navigation
+
+@code {
+    [Parameter] public string? EntityId { get; set; }
+    private CustomerDTO? entity { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(EntityId))
+        {
+            try
+            {
+                int id = Convert.ToInt32(encryptor.Decrypt(EntityId));
+                entity = await service.GetByID(id);
+                if (entity == null)
+                {
+                    //show invalid URL error via toaster
+                }
+            }
+            catch (Exception ex) { throw ex; }
+        }
+    }
+
+    private async void OnSubmit(EditContext editContext)
+    {
+        try
+        {
+            if (editContext!.Validate())
+            {
+                if (!string.IsNullOrWhiteSpace(EntityId))
+                {
+                    // Update existing record
+                    bool isUpdated = await service.Update(entity);
+                    if (isUpdated)
+                    {
+                        Navigation.NavigateTo("/customer/list");
+                    }
+                }
+                else
+                {
+                    // Add new record
+                    entity!.CreatedOn = DateTime.Now;
+                    entity.Status = (int)Status.Active;
+                    bool isAdded = await service.Add(entity);
+                    if (isAdded)
+                    {
+                        Navigation.NavigateTo("/customer/list");
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            throw ex;
+        }
+    }
+}

@@ -1,0 +1,86 @@
+﻿<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <img src="resources/images/logo.png" width="200" />
+    </div>
+</div>
+
+<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+
+<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+    <nav class="flex-column">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link px-3" href="" Match="NavLinkMatch.All">
+                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Dashboard
+            </NavLink>
+        </div>
+        <hr class="white">
+        <h5 class="mx-4 white">Accounts</h5>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link px-3" href="account/list">
+                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Manage Accounts
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link px-3" href="payee/list">
+                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Manage Payees
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link px-3" href="payment/list">
+                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Manage Payments
+            </NavLink>
+        </div>
+
+        <hr class="white">
+        <h5 class="mx-4 white">Raw Material</h5>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link px-3" href="raw-material/list">
+                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Manage Raw Materials
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link px-3" href="supplier/list">
+                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Manage Suppliers
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link px-3" href="raw-material/order/list">
+                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Raw Materials Orders
+            </NavLink>
+        </div>
+        <hr class="white">
+        <h5 class="mx-4 white">Products</h5>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link px-3" href="product/list">
+                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Manage Products
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link px-3" href="customer/list">
+                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Manage Customers
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link px-3" href="dyeing/vendor/list">
+                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Manage Dyeing Vendors
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link px-3" href="sharing/vendor/list">
+                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Manage Sharing Vendors
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link px-3" href="user/list">
+                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Manage Users
+            </NavLink>
+        </div>
+    </nav>
+</div>

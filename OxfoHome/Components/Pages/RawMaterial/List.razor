@@ -1,0 +1,106 @@
+﻿@page "/raw-material/list"
+
+@using OxfoHome.DAL
+@using OxfoHome.DAL.DTOs
+@using OxfoHome.DAL.Services
+
+<PageTitle>Manage Raw Materials - OxfoHome</PageTitle>
+
+<div class="row mt-3">
+    <div class="col-md-6">
+        <h3>Manage Raw Materials</h3>
+    </div>
+    <div class="col-md-6">
+        <LinkButton Title="Add Raw Material" Link="/raw-material/info" />
+    </div>
+</div>
+
+@if (data == null)
+{
+    <Loader />
+}
+else if (data.Count() == 0)
+{
+    <div class="alert alert-primary text-center" role="alert">
+    No data found!
+</div>
+}
+else
+{
+    <div class="card">
+    <div class="card-body">
+        <table class="table table-striped table-hover dataGrid">
+            <thead>
+                <tr>
+                    <th>Item Name</th>
+                    <th>Yarn Count</th>
+                    <th>Quantity</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in data)
+                    {
+                        string encryptedId = encryptor.Encrypt(item.Id.ToString());
+                        <tr>
+                            <td><a href="/raw-material/detail/@encryptedId">@item.ItemName</a></td>
+                            <td>@item.YarnCount</td>
+                            <td>@item.Quantity</td>
+                            <td>
+                                <a href="/raw-material/info/@encryptedId" class="no-underline">Edit</a> |
+                                <a href="/raw-material/detail/@encryptedId" class="no-underline">Details</a> |
+                                <button @onclick="() => ShowConfirmDialog(item.Id)" class="link red">Delete</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <ConfirmDialog @ref="confirmDialog" Title="Confirm!" Message="Are you sure you want to delete this record?"
+    ConfirmationResult="OnConfirmationResult" />
+    <Toast @ref="toaster" Title="Deleted!" Color="Green" Message="The record is deleted" />
+}
+
+@inject IRawMaterialService service
+@inject IEncryptionService encryptor
+
+@code {
+    private int selectedId;
+    private ConfirmDialog? confirmDialog;
+
+    private Toast? toaster;
+
+    private IQueryable<RawMaterialDTO>? data;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        data = await service.GetAll();
+        StateHasChanged();
+    }
+
+    private void ShowConfirmDialog(int id)
+    {
+        selectedId = id;
+        confirmDialog!.Show();
+    }
+
+    private async void OnConfirmationResult(bool isConfirmed)
+    {
+        if (isConfirmed && selectedId > 0)
+        {
+            if (await service.Delete(selectedId))
+            {
+                toaster!.Show(seconds: 2);
+                await LoadData();
+                StateHasChanged();
+            }
+            selectedId = 0; // Reset the selected item
+        }
+    }
+}

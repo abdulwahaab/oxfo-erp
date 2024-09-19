@@ -1,0 +1,147 @@
+﻿@page "/user/info/{EntityId?}"
+
+@using OxfoHome.DAL
+@using OxfoHome.DAL.DTOs
+@using OxfoHome.DAL.Services
+
+<PageTitle>@(!string.IsNullOrWhiteSpace(EntityId) ? "Edit User - OxfoHome" : "Create User - OxfoHome")</PageTitle>
+
+<BackTo Link="/user/list" Title="Back to manage users" />
+
+@if (roles != null)
+{
+    <div class="row mt-3">
+    <h3>@(!string.IsNullOrWhiteSpace(EntityId) ? "Edit User" : "Create User")</h3>
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <EditForm Model="entity" OnSubmit="OnSubmit">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+                    <div class="form-card">
+                        <div class="row">
+                            <div class="form-group col-lg-6 mt-3">
+                                <label for="name">Name</label>
+                                <InputText @bind-Value="entity.Name" focus class="form-control" type="text" id="name"
+                                    required />
+                            </div>
+
+                            <div class="form-group col-lg-6 mt-3">
+                                <label for="email">Email</label>
+                                <InputText @bind-Value="entity.Email" focus class="form-control" type="email" id="email"
+                                    required />
+                            </div>
+
+                            <div class="form-group col-lg-6 mt-3">
+                                <label for="role">User Role</label>
+                                <InputSelect @bind-Value="entity.RoleId" class="form-select">
+                                    <option value="0">Select Role</option>
+                                    @foreach (var item in roles)
+                                        {
+                                            <option value="@item.Id">@item.Name</option>
+                                        }
+                                    </InputSelect>
+                                    @* <InputText @bind-Value="entity.RoleId" class="form-control" placeholder="Role"
+                                type="text" id="role" required /> *@
+                                </div>
+
+                                <div class="form-group col-lg-6 mt-3">
+                                    <label for="phone">Phone</label>
+                                    <InputText @bind-Value="entity.Phone" class="form-control" type="text" id="phone"
+                                        required />
+                                </div>
+
+                                <div class="form-group col-lg-6 mt-3">
+                                    <label for="password">Password</label>
+                                    <InputText @bind-Value="entity.Password" class="form-control" type="text"
+                                        id="password" />
+                                </div>
+
+                                <div class="form-group col-lg-6 mt-3">
+                                    <label for="confirm-password">Confirm Password</label>
+                                    <InputText @bind-Value="entity.ConfirmPassword" class="form-control" type="text"
+                                        id="confirm-password" />
+                                </div>
+
+                                <div class="form-group col-lg-12 mt-3 d-flex justify-content-end">
+                                    <button type="submit" class="btn btn-primary">
+                                        @(!string.IsNullOrWhiteSpace(EntityId) ? "Update User" : "Create User")
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <loader />
+}
+
+@inject IUserService service
+@inject IHashService hashService
+@inject IEncryptionService encryptor
+@inject NavigationManager Navigation
+
+@code {
+    [Parameter] public string? EntityId { get; set; }
+    private UserDTO? entity { get; set; } = new();
+    private IQueryable<RoleDTO> roles { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        roles = await service.GetAllRoles();
+        if (!string.IsNullOrWhiteSpace(EntityId))
+        {
+            try
+            {
+                int id = Convert.ToInt32(encryptor.Decrypt(EntityId));
+                entity = await service.GetByID(id);
+                if (entity != null)
+                {
+                    entity.Password = "";
+                }
+            }
+            catch (Exception ex) { throw ex; }
+        }
+    }
+
+    private async void OnSubmit(EditContext editContext)
+    {
+        try
+        {
+            if (editContext!.Validate())
+            {
+                if (!string.IsNullOrWhiteSpace(EntityId))
+                {
+                    // Update existing record
+                    if (!string.IsNullOrWhiteSpace(entity.Password))
+                    {
+                        entity.Password = hashService.HashPassword(entity.Password);
+                    }
+                    bool isUpdated = await service.Update(entity);
+                    if (isUpdated)
+                    {
+                        Navigation.NavigateTo("/user/list");
+                    }
+                }
+                else
+                {
+                    // Add new record
+                    entity.Password = hashService.HashPassword(entity.Password);
+                    entity!.CreatedOn = DateTime.Now;
+                    entity.Status = (int)Status.Active;
+                    bool isAdded = await service.Add(entity);
+                    if (isAdded)
+                    {
+                        Navigation.NavigateTo("/user/list");
+                    }
+                }
+            }
+        }
+        catch (Exception ex) { throw ex; }
+    }
+}

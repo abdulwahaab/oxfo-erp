@@ -1,0 +1,112 @@
+﻿@page "/raw-material/info/{EntityId?}"
+
+@using OxfoHome.DAL
+@using OxfoHome.DAL.DTOs
+@using OxfoHome.DAL.Services
+
+<PageTitle>@(!string.IsNullOrWhiteSpace(EntityId) ? "Edit Raw Material - OxfoHome" : "Add Raw Material - OxfoHome")
+</PageTitle>
+
+<BackTo Link="/raw-material/list" Title="Back to manage raw materials" />
+
+<div class="row mt-3">
+    <h3>@(!string.IsNullOrWhiteSpace(EntityId) ? "Edit Raw Material" : "Add Raw Material")</h3>
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <EditForm Model="entity" OnSubmit="OnSubmit" FormName="AddAccount">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+                    <div class="form-card">
+                        <div class="row">
+                            <div class="form-group col-lg-6">
+                                <label for="name">Item Name</label>
+                                <InputText @bind-Value="entity.ItemName" class="form-control" type="text" id="name"
+                                    required />
+                            </div>
+
+                            <div class="form-group col-lg-6">
+                                <label for="yarnCount">Yarn Count</label>
+                                <InputNumber @bind-Value="entity.YarnCount" class="form-control" type="text"
+                                    id="yarnCount" />
+                            </div>
+                            <div class="form-group col-lg-6 mt-3">
+                                <label for="quantity">Quantity</label>
+                                <InputNumber @bind-Value="entity.Quantity" class="form-control" type="number"
+                                    id="quantity" />
+                            </div>
+
+                            <div class="form-group col-lg-12 mt-3">
+                                <label for="description">Description</label>
+                                <MultilineInput @bind-Value="entity.Description" class="form-control"
+                                    id="description" />
+                            </div>
+
+                            <div class="form-group col-lg-12 mt-3 d-flex justify-content-end">
+                                <button type="submit" class="btn btn-primary">
+                                    @(!string.IsNullOrWhiteSpace(EntityId) ? "Update Raw Material" : "Add Raw Material")
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+</div>
+
+@inject IRawMaterialService service
+@inject IEncryptionService encryptor
+@inject NavigationManager Navigation
+
+@code {
+    [Parameter] public string? EntityId { get; set; }
+    private RawMaterialDTO? entity { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(EntityId))
+        {
+            try
+            {
+                int id = Convert.ToInt32(encryptor.Decrypt(EntityId));
+                entity = await service.GetByID(id);
+                if (entity == null)
+                {
+                    //show invalid URL error via toaster
+                }
+            }
+            catch (Exception ex) { throw ex; };
+        }
+    }
+
+
+    private async void OnSubmit(EditContext editContext)
+    {
+        try
+        {
+            if (editContext!.Validate())
+            {
+                if (!string.IsNullOrWhiteSpace(EntityId))
+                {
+                    // Update existing customer
+                    bool isUpdated = await service.Update(entity);
+                    if (isUpdated)
+                    {
+                        Navigation.NavigateTo("/raw-material/list");
+                    }
+                }
+                else
+                {
+                    // Add new customer
+                    bool isAdded = await service.Add(entity);
+                    if (isAdded)
+                    {
+                        Navigation.NavigateTo("/raw-material/list");
+                    }
+                }
+            }
+        }
+        catch (Exception ex) { throw ex; }
+    }
+}

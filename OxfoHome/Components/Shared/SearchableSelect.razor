@@ -1,0 +1,127 @@
+@typeparam TItem
+@typeparam TValue
+
+<div class="searchable-select" @onmousedown="HandleMouseDown" @onfocusout="HandleFocusOut" tabindex="0">
+    <input type="text" @bind="searchText" @bind:event="oninput" placeholder="Type to search" class="form-control"
+        @onfocus="ShowDropdown" @onkeydown="HandleKeyDown" />
+
+    <ul class="dropdown-menu" style="display: @(showDropdown ? "block" : "none");"
+        @onmousedown="HandleDropdownMouseDown">
+        @if (FilteredItems != null && FilteredItems.Any())
+        {
+            @foreach (var item in FilteredItems)
+            {
+                <li @onclick="() => SelectItem(item)" class="dropdown-item">
+                    @GetDisplayText(item)
+                </li>
+            }
+        }
+        else
+        {
+            <li class="dropdown-item">No results found</li>
+        }
+    </ul>
+</div>
+
+@code {
+    [Parameter] public IEnumerable<TItem> Items { get; set; }
+    [Parameter] public string TextPropertyName { get; set; }
+    [Parameter] public string ValuePropertyName { get; set; }
+
+    [Parameter] public TValue Value { get; set; }
+    [Parameter] public EventCallback<TValue> ValueChanged { get; set; }
+
+    private string searchText = string.Empty;
+    private bool showDropdown = false;
+    private bool isDropdownClicked = false;
+
+    private IEnumerable<TItem> FilteredItems => string.IsNullOrWhiteSpace(searchText)
+    ? Items
+    : Items?.Where(item => GetDisplayText(item).Contains(searchText, StringComparison.OrdinalIgnoreCase));
+
+    private async Task SelectItem(TItem item)
+    {
+        Value = GetValue(item);
+        searchText = GetDisplayText(item);
+        showDropdown = false;
+        await ValueChanged.InvokeAsync(Value);
+    }
+
+    private string GetDisplayText(TItem item)
+    {
+        var property = typeof(TItem).GetProperty(TextPropertyName);
+        return property?.GetValue(item)?.ToString() ?? string.Empty;
+    }
+
+    private TValue GetValue(TItem item)
+    {
+        var property = typeof(TItem).GetProperty(ValuePropertyName);
+        return (TValue)property?.GetValue(item);
+    }
+
+    private void ShowDropdown()
+    {
+        showDropdown = true;
+        isDropdownClicked = false; // Reset flag when showing dropdown again
+    }
+
+    private void HandleKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape")
+        {
+            HideDropdown();
+        }
+    }
+
+    private void HandleFocusOut(FocusEventArgs args)
+    {
+        if (!isDropdownClicked)
+        {
+            HideDropdown();
+        }
+        isDropdownClicked = false; // Reset flag after focus out
+    }
+
+    private void HandleMouseDown()
+    {
+        // Mark that the dropdown or input was clicked to prevent closing on blur
+        isDropdownClicked = true;
+    }
+
+    private void HandleDropdownMouseDown()
+    {
+        // Prevent dropdown from closing when interacting with the dropdown itself
+        isDropdownClicked = true;
+    }
+
+    private void HideDropdown()
+    {
+        showDropdown = false;
+        isDropdownClicked = false; // Ensure the flag is reset
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (string.IsNullOrWhiteSpace(searchText))
+        {
+            Value = default;
+            searchText = string.Empty;
+        }
+        else
+        {
+            var selectedItem = Items.FirstOrDefault(item => Equals(GetValue(item), Value));
+            if (selectedItem != null)
+            {
+                searchText = GetDisplayText(selectedItem);
+            }
+        }
+    }
+
+    public async Task Clear()
+    {
+        Value = default;
+        searchText = string.Empty;
+        await ValueChanged.InvokeAsync(Value);
+        HideDropdown();
+    }
+}

@@ -1,0 +1,14 @@
+﻿<a href="@Link" class="no-underline mb-3" style="display: block;">
+    <i class="material-icons back-arrow">
+        arrow_back_ios
+    </i>
+    @(!string.IsNullOrEmpty(Title) ? Title : "Go back")
+</a>
+@code {
+    [Parameter]
+    public string? Link { get; set; }
+
+    [Parameter]
+    public string? Title { get; set; }
+
+}

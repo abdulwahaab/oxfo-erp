@@ -1,0 +1,28 @@
+﻿@using OxfoHome.DAL
+
+<div class="d-flex @(Align.ToLower() =="left" ? "justify-content-start" : "justify-content-end")">
+    <a href="@Link" class="btn mb-3 @GetButtonClass()">@Title</a>
+</div>
+
+@code {
+    [Parameter] public string? Link { get; set; }
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string? Align { get; set; } = "right";
+    [Parameter] public Colors Color { get; set; }
+
+    private string GetButtonClass()
+    {
+        return Color switch
+        {
+            Colors.Blue => "btn-primary",
+            Colors.Gray => "btn-secondary",
+            Colors.Green => "btn-success",
+            Colors.Red => "btn-danger",
+            Colors.Yellow => "btn-warning",
+            Colors.Teal => "btn-info",
+            Colors.Light => "btn-light",
+            Colors.Dark => "btn-dark",
+            _ => "btn-primary" // default class if none match
+        };
+    }
+}

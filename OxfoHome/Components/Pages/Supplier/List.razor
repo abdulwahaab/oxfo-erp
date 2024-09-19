@@ -1,0 +1,156 @@
+﻿@page "/supplier/list"
+
+@using OxfoHome.DAL
+@using OxfoHome.DAL.DTOs
+@using OxfoHome.DAL.Services
+
+<PageTitle>Manage Suppliers - OxfoHome</PageTitle>
+
+<div class="row mt-3">
+    <div class="col-md-6">
+        <h3>Manage Suppliers</h3>
+    </div>
+    <div class="col-md-6">
+        <LinkButton Title="Add Supplier" Link="/supplier/info" />
+    </div>
+</div>
+
+@if (data == null)
+{
+    <Loader />
+}
+else if (data.Items.Count() == 0)
+{
+    <div class="alert alert-primary text-center" role="alert">
+    No data found!
+</div>
+}
+else
+{
+    <div class="card">
+    <div class="card-body">
+        <table class="table table-striped table-hover dataGrid">
+            <thead>
+                <tr>
+                    <th class="sort col-md-3" @onclick="() => SortColumn(1)">
+                        Name <i class="material-icons">arrow_drop_down</i>
+                    </th>
+                    <th class="sort col-md-3" @onclick="() => SortColumn(2)">
+                        Contact Name <i class="material-icons">arrow_drop_down</i>
+                    </th>
+                    <th class="col-md-3">Contact Phone</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in data.Items)
+                    {
+                        string encryptedId = encryptor.Encrypt(item.Id.ToString());
+                        <tr>
+                            <td><a href="/supplier/detail/@encryptedId">@item.Name</a></td>
+                            <td>@item.ContactName</td>
+                            <td>@item.ContactPhone</td>
+                            <td>
+                                <a href="/supplier/info/@encryptedId" class="no-underline">Edit</a> | <a
+                                    href="/supplier/detail/@encryptedId" class="no-underline">Details</a> | <button
+                                    @onclick="() => ShowConfirmDialog(item.Id)" class="link red">Delete</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <Pagination TotalPages="totalPages" CurrentPage="currentPage" GoToPage="GoToPage" />
+        </div>
+    </div>
+    <ConfirmDialog @ref="confirmDialog" Title="Confirm!" Message="Are you sure you want to delete this record?"
+    ConfirmationResult="OnConfirmationResult" />
+    <Toast @ref="toaster" Title="Deleted!" Color="Green" Message="The record is deleted" />
+}
+
+@inject ISupplierService service
+@inject IEncryptionService encryptor
+
+@code {
+    private int totalPages, pageSize = 10, currentPage = 1, currentSortColumn = 1, selectedItem;
+    private bool sortAscending = true, isLoading;
+    private Toast? toaster;
+    private ConfirmDialog? confirmDialog;
+    private PagedResult<SupplierDTO>? data;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task GoToPage(int page)
+    {
+        if (page < 1) page = 1;
+        if (page > totalPages) page = totalPages;
+        currentPage = page;
+        await LoadData();
+    }
+
+    private async void SortColumn(int columnId)
+    {
+        if (currentSortColumn == columnId)
+        {
+            sortAscending = !sortAscending;
+        }
+        else
+        {
+            currentSortColumn = columnId;
+            sortAscending = !sortAscending;
+        }
+
+        currentPage = 1;
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        if (isLoading) return;
+
+        isLoading = true;
+
+        try
+        {
+            if (currentSortColumn == 1 && sortAscending)
+                data = await service.GetPagedListAsync(currentPage, pageSize, (query => query.OrderBy(x => x.Name)));
+            else if (currentSortColumn == 1 && !sortAscending)
+                data = await service.GetPagedListAsync(currentPage, pageSize, (query => query.OrderByDescending(x =>
+                x.Name)));
+
+            else if (currentSortColumn == 2 && sortAscending)
+                data = await service.GetPagedListAsync(currentPage, pageSize, (query => query.OrderBy(x => x.ContactName)));
+            else if (currentSortColumn == 2 && !sortAscending)
+                data = await service.GetPagedListAsync(currentPage, pageSize, (query => query.OrderByDescending(x =>
+                x.ContactName)));
+
+            totalPages = (data!.TotalCount + pageSize - 1) / pageSize;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ShowConfirmDialog(int id)
+    {
+        selectedItem = id;
+        confirmDialog!.Show();
+    }
+
+    private async void OnConfirmationResult(bool isConfirmed)
+    {
+        if (isConfirmed && selectedItem > 0)
+        {
+            if (await service.Delete(selectedItem))
+            {
+                toaster!.Show(seconds: 2);
+                await LoadData();
+                StateHasChanged();
+            }
+            selectedItem = 0; // Reset the selected item
+        }
+    }
+}

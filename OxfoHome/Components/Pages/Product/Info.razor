@@ -1,0 +1,118 @@
+﻿@page "/product/info/{EntityId?}"
+
+@using OxfoHome.DAL
+@using OxfoHome.DAL.DTOs
+@using OxfoHome.DAL.Services
+
+<PageTitle>@(!string.IsNullOrWhiteSpace(EntityId) ? "Edit Product - OxfoHome" : "Add Product - OxfoHome")</PageTitle>
+
+<BackTo Link="/product/list" Title="Back to manage products" />
+
+<div class="row mt-3">
+    <h3>@(!string.IsNullOrWhiteSpace(EntityId) ? "Edit Product" : "Add Product")</h3>
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <EditForm Model="entity" OnSubmit="OnSubmit">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+                    <div class="form-card">
+                        <div class="row">
+                            <div class="form-group col-lg-6">
+                                <label for="name">Name</label>
+                                <InputText @bind-Value="entity.Name" focus class="form-control" type="text" id="name"
+                                    required />
+                            </div>
+                            <div class="form-group col-lg-6">
+                                <label for="price">Price Per Dozen</label>
+                                <InputNumber @bind-Value="entity.PricePerDozen" class="form-control" type="text"
+                                    id="price" required />
+                            </div>
+                            <div class="form-group col-lg-6 mt-3">
+                                <label for="color">Color</label>
+                                <InputText @bind-Value="entity.Color" class="form-control" type="text" id="color" />
+                            </div>
+                            <div class="form-group col-lg-6 mt-3">
+                                <label for="quantity">Quantity</label>
+                                <InputNumber @bind-Value="entity.Quantity" class="form-control" type="number"
+                                    id="quantity" />
+                            </div>
+
+                            <div class="form-group col-lg-12 mt-3">
+                                <label for="description">Description</label>
+                                <MultilineInput @bind-Value="entity.Description" class="form-control"
+                                    id="description" />
+                            </div>
+
+                            <div class="form-group col-lg-12 mt-3 d-flex justify-content-end">
+                                <button type="submit" class="btn btn-primary">
+                                    @(!string.IsNullOrWhiteSpace(EntityId) ? "Update Product" : "Add Product")
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+</div>
+
+@inject IProductService service
+@inject IEncryptionService encryptor
+@inject NavigationManager Navigation
+
+@code {
+    [Parameter] public string? EntityId { get; set; }
+    private ProductDTO? entity { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(EntityId))
+        {
+            try
+            {
+                int id = Convert.ToInt32(encryptor.Decrypt(EntityId));
+                entity = await service.GetByID(id);
+                if (entity == null)
+                {
+                    //show invalid URL error via toaster
+                }
+            }
+            catch (Exception ex) { throw ex; };
+        }
+    }
+
+    private async void OnSubmit(EditContext editContext)
+    {
+        try
+        {
+            if (editContext!.Validate())
+            {
+                if (!string.IsNullOrWhiteSpace(EntityId))
+                {
+                    // Update existing customer
+                    bool isUpdated = await service.Update(entity);
+                    if (isUpdated)
+                    {
+                        Navigation.NavigateTo("/product/list");
+                    }
+                }
+                else
+                {
+                    // Add new customer
+                    entity!.CreatedOn = DateTime.Now;
+                    entity.Status = (int)Status.Active;
+                    bool isAdded = await service.Add(entity);
+                    if (isAdded)
+                    {
+                        Navigation.NavigateTo("/product/list");
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            throw ex;
+        }
+    }
+}

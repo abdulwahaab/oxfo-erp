@@ -1,0 +1,1 @@
+﻿dotnet ef dbcontext scaffold "Server=tcp:apex92.database.windows.net,1433;Initial Catalog=OxfoHome;Persist Security Info=False;User ID=Apex92Admin;Password=AdminApex92&*^;TrustServerCertificate=True;" Microsoft.EntityFrameworkCore.SqlServer -o Entities -c ApplicationDbContext --context-dir Context --namespace OxfoHome.Data.Entities -f

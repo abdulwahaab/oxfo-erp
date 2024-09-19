@@ -1,0 +1,226 @@
+﻿@page "/account/list"
+
+@using OxfoHome.DAL
+@using OxfoHome.DAL.DTOs
+@using OxfoHome.DAL.Services
+
+<PageTitle>Manage Accounts - OxfoHome</PageTitle>
+
+<div class="row mt-3">
+    <div class="col-md-6">
+        <h3>Manage Accounts</h3>
+    </div>
+    <div class="col-md-6">
+        <LinkButton Title="Add Account" Link="/account/info" />
+    </div>
+</div>
+
+@* <div class="row">
+<div class="col-lg-4">
+<div class="d-flex">
+<InputText @bind-Value="searchQuery" @oninput="UpdateSearchQuery" @onkeypress="HandleKeyPress"
+class="form-control me-2" placeholder="Search">
+</InputText>
+<button class="btn btn-success" type="submit" @onclick="SearchList">Search</button>
+<button class="btn btn-danger ms-1" type="submit" @onclick="ClearSearch">Clear</button>
+</div>
+</div>
+</div> *@
+
+@if (data == null)
+{
+    <Loader />
+}
+else if (data.Items.Count() == 0)
+{
+    <div class="alert alert-primary text-center mt-3" role="alert">
+    No data found!
+</div>
+}
+else
+{
+    <div class="card mt-3">
+    <div class="card-body">
+        <table class="table table-striped table-hover dataGrid">
+            <thead>
+                <tr>
+                    <th class="sort col-md-3" @onclick="() => SortColumn(1)">
+                        Account Title <i class="material-icons">arrow_drop_down</i>
+                    </th>
+                    <th class="sort col-md-3" @onclick="() => SortColumn(2)">
+                        Account Number <i class="material-icons">arrow_drop_down</i>
+                    </th>
+                    <th class="sort col-md-2" @onclick="() => SortColumn(3)">
+                        Bank Name <i class="material-icons">arrow_drop_down</i>
+                    </th>
+                    <th class="sort col-md-2" @onclick="() => SortColumn(4)">
+                        Balance <i class="material-icons">arrow_drop_down</i>
+                    </th>
+                    <th class="col-md-2">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (isLoading)
+                    {
+                        <tr>
+                            <td colspan="5">
+                                <Loader />
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var item in data.Items)
+                        {
+                            string encryptedId = encryptor.Encrypt(item.Id.ToString());
+                            <tr>
+                                <td>
+                                    <a href="/account/detail/@encryptedId">@item.AccountName</a>
+                                </td>
+                                <td>@item.AccountNumber</td>
+                                <td>@item.BankName</td>
+                                <td>@item.Balance</td>
+                                <td>
+                                    <a href="/account/info/@encryptedId" class="no-underline">Edit</a> |
+                                    <a href="/account/detail/@encryptedId" class="no-underline">Details</a> | <button
+                                        @onclick="() => ShowConfirmDialog(item.Id)" class="link red">Delete</button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+            <Pagination TotalPages="totalPages" CurrentPage="currentPage" GoToPage="GoToPage" />
+        </div>
+    </div>
+    <ConfirmDialog @ref="confirmDialog" Title="Confirm!" Message="Are you sure you want to delete this record?"
+    ConfirmationResult="OnConfirmationResult" />
+    <Toast @ref="toaster" Title="Deleted!" Color="Green" Message="The record is deleted" />
+}
+
+@inject IEncryptionService encryptor
+@inject IAccountService accountService
+
+@code {
+    private int totalPages, pageSize = 10, currentPage = 1, currentSortColumn = 1, selectedItem;
+    private bool sortAscending = true, isLoading = false;
+    private string? searchQuery;
+    private Toast? toaster;
+    private ConfirmDialog? confirmDialog;
+    private PagedResult<AccountDTO>? data;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task GoToPage(int page)
+    {
+        if (page < 1) page = 1;
+        if (page > totalPages) page = totalPages;
+        currentPage = page;
+        await LoadData();
+    }
+
+    private async Task SortColumn(int columnId)
+    {
+        if (currentSortColumn == columnId)
+        {
+            sortAscending = !sortAscending;
+        }
+        else
+        {
+            currentSortColumn = columnId;
+            sortAscending = !sortAscending;
+        }
+
+        currentPage = 1;
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        if (isLoading) return;
+
+        isLoading = true;
+        try
+        {
+            if (currentSortColumn == 1 && sortAscending)
+                data = await accountService.GetPagedListAsync(currentPage, pageSize, (query => query.OrderBy(x => x.AccountName)),
+                filter: string.IsNullOrWhiteSpace(searchQuery) ? null : (x => x.AccountName.Contains(searchQuery)
+                || x.AccountNumber.Contains(searchQuery)
+                || x.BankName.Contains(searchQuery)));
+            else if (currentSortColumn == 1 && !sortAscending)
+                data = await accountService.GetPagedListAsync(currentPage, pageSize, (query => query.OrderByDescending(x =>
+                x.AccountName)));
+
+            else if (currentSortColumn == 2 && sortAscending)
+                data = await accountService.GetPagedListAsync(currentPage, pageSize, (query => query.OrderBy(x => x.AccountNumber)));
+            else if (currentSortColumn == 2 && !sortAscending)
+                data = await accountService.GetPagedListAsync(currentPage, pageSize, (query => query.OrderByDescending(x =>
+                x.AccountNumber)));
+
+            else if (currentSortColumn == 3 && sortAscending)
+                data = await accountService.GetPagedListAsync(currentPage, pageSize, (query => query.OrderBy(x => x.BankName)));
+            else if (currentSortColumn == 3 && !sortAscending)
+                data = await accountService.GetPagedListAsync(currentPage, pageSize, (query => query.OrderByDescending(x =>
+                x.BankName)));
+
+            else if (currentSortColumn == 4 && sortAscending)
+                data = await accountService.GetPagedListAsync(currentPage, pageSize, (query => query.OrderBy(x => x.Balance)));
+            else if (currentSortColumn == 4 && !sortAscending)
+                data = await accountService.GetPagedListAsync(currentPage, pageSize, (query => query.OrderByDescending(x =>
+                x.Balance)));
+
+            totalPages = (data!.TotalCount + pageSize - 1) / pageSize;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ShowConfirmDialog(int id)
+    {
+        selectedItem = id;
+        confirmDialog!.Show();
+    }
+
+    private async void OnConfirmationResult(bool isConfirmed)
+    {
+        if (isConfirmed && selectedItem > 0)
+        {
+            if (await accountService.Delete(selectedItem))
+            {
+                toaster!.Show(seconds: 2);
+                await LoadData();
+                StateHasChanged();
+            }
+            selectedItem = 0; // Reset the selected item
+        }
+    }
+
+    @* private async Task HandleKeyPress(KeyboardEventArgs e)
+{
+if (e.Key == "Enter")
+await SearchList();
+}
+
+private async Task UpdateSearchQuery(ChangeEventArgs e)
+{
+searchQuery = e.Value?.ToString();
+}
+
+private async Task SearchList()
+{
+if (!string.IsNullOrWhiteSpace(searchQuery))
+currentPage = 1;
+await LoadData();
+}
+
+private async Task ClearSearch()
+{
+searchQuery = "";
+await LoadData();
+} *@
+}

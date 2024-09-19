@@ -1,0 +1,128 @@
+﻿@page "/dyeing/price/list/{VendorId}"
+
+@using OxfoHome.DAL
+@using OxfoHome.DAL.DTOs
+@using OxfoHome.DAL.Services
+
+<PageTitle>Manage Dyeing Vendor Prices - OxfoHome</PageTitle>
+
+<BackTo Link="/dyeing/vendor/list" Title="Back to manage dyeing vendors" />
+
+<div class="row mt-3">
+    <div class="col-md-6">
+        <h3>Manage Dyeing Vendor Prices</h3>
+    </div>
+    <div class="col-md-6">
+        <LinkButton Title="Add Dyeing Vendor Price" Link="@($"/dyeing/price/info/{VendorId}")" />
+    </div>
+</div>
+
+@if (data == null)
+{
+    <Loader />
+}
+else if (data.Items.Count() == 0)
+{
+    <div class="alert alert-primary text-center" role="alert">
+    No data found!
+</div>
+}
+else
+{
+    <div class="card">
+    <div class="card-body">
+        <table class="table table-striped table-hover dataGrid">
+            <thead>
+                <tr>
+                    <th>
+                        Color
+                    </th>
+                    <th>
+                        Price
+                    </th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in data.Items)
+                    {
+                        string encryptedId = encryptor.Encrypt(item.Id.ToString());
+                        <tr>
+                            <th>@item.Color</th>
+                            <td>@item.Price</td>
+                            <td>
+                                <a href="@($"/dyeing/price/info/{VendorId}/{encryptedId}")" class="no-underline">Edit</a> |
+                                <a href="@($"/dyeing/price/detail/{VendorId}/{encryptedId}")" class="no-underline">Detail</a> |
+                                <button @onclick="() => ShowConfirmDialog(item.Id)" class="link red">Delete</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <Pagination TotalPages="totalPages" CurrentPage="currentPage" GoToPage="GoToPage" />
+        </div>
+    </div>
+    <ConfirmDialog @ref="confirmDialog" Title="Confirm!" Message="Are you sure you want to delete this record?"
+    ConfirmationResult="OnConfirmationResult" />
+    <Toast @ref="toaster" Title="Deleted!" Color="Green" Message="The record is deleted" />
+}
+
+@inject IDyeingService service
+@inject IEncryptionService encryptor
+
+@code {
+    private int totalPages;
+    private int pageSize = 10;
+    private int currentPage = 1;
+    private int selectedId;
+    private ConfirmDialog? confirmDialog;
+    private Toast? toaster;
+
+    [Parameter] public string? VendorId { get; set; }
+
+    private PagedResult<DyeingColorRateDTO>? data;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task GoToPage(int page)
+    {
+        if (page < 1) page = 1;
+        if (page > totalPages) page = totalPages;
+        currentPage = page;
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        if (!string.IsNullOrWhiteSpace(VendorId))
+        {
+            int id = Convert.ToInt32(encryptor.Decrypt(VendorId));
+            data = await service.GetVendorPriceList(currentPage, pageSize, id);
+        }
+
+        totalPages = (data!.TotalCount + pageSize - 1) / pageSize;
+    }
+
+    private void ShowConfirmDialog(int id)
+    {
+        selectedId = id;
+        confirmDialog!.Show();
+    }
+
+    private async void OnConfirmationResult(bool isConfirmed)
+    {
+        if (isConfirmed && selectedId > 0)
+        {
+            if (await service.DeletePrice(selectedId))
+            {
+                toaster!.Show(seconds: 2);
+                await LoadData();
+                StateHasChanged();
+            }
+            selectedId = 0; // Reset the selected item
+        }
+    }
+}

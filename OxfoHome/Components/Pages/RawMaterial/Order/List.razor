@@ -1,0 +1,225 @@
+﻿@page "/raw-material/order/list"
+
+@using OxfoHome.DAL
+@using OxfoHome.DAL.DTOs
+@using OxfoHome.DAL.Services
+
+<PageTitle>Raw Material Orders - OxfoHome</PageTitle>
+
+<div class="row mt-3">
+    <div class="col-md-6">
+        <h3>Raw Material Orders</h3>
+    </div>
+    <div class="col-md-6">
+        <LinkButton Title="Create New Order" Link="/raw-material/order/info" />
+    </div>
+</div>
+
+<div class="row mb-2">
+    <div class="col-md-3">
+        <label for="order-status"><b>Order Status</b></label>
+        <select @onchange="FilterOrders" class="form-select" id="order-status">
+            <option value="0">All</option>
+            <option value="@Status.Pending">Pending</option>
+            <option value="@Status.Completed">Completed</option>
+            <option value="@Status.Cancelled">Cancelled</option>
+        </select>
+    </div>
+</div>
+
+@if (data == null)
+{
+    <Loader />
+}
+else if (data.Items.Count() == 0)
+{
+    <div class="alert alert-primary text-center" role="alert">
+    No data found!
+</div>
+}
+else
+{
+    <div class="card">
+    <div class="card-body">
+        <table class="table table-striped table-hover dataGrid">
+            <thead>
+                <tr>
+                    <th class="sort" @onclick="() => SortColumn(1)">
+                        Order ID <i class="material-icons">arrow_drop_down</i>
+                    </th>
+                    <th class="sort" @onclick="() => SortColumn(2)">Supplier Name <i
+                            class="material-icons">arrow_drop_down</i></th>
+                    <th class="sort" @onclick="() => SortColumn(4)">Total Amount <i
+                            class="material-icons">arrow_drop_down</i></th>
+                    <th class="sort" @onclick="() => SortColumn(5)">Created On <i
+                            class="material-icons">arrow_drop_down</i></th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (isLoading)
+                    {
+                        <tr>
+                            <td colspan="5">
+                                <Loader />
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var item in data.Items)
+                        {
+                            string encryptedId = encryptor.Encrypt(item.Id.ToString());
+                            <tr>
+                                <th>@item.Id</th>
+                                <td>@item.SupplierName</td>
+                                <td>@item.TotalAmount</td>
+                                <td>@item.CreatedOn</td>
+                                <td>@(Enum.GetName(typeof(Status), item.Status))</td>
+                                <td>
+                                    <a href="/raw-material/order/info/@encryptedId" class="no-underline">Edit</a> | <a
+                                        href="/raw-material/order/detail/@encryptedId" class="no-underline">Details</a> | <button
+                                        @onclick="() => ShowConfirmDialog(item.Id)" class="link red">Delete</button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+            <Pagination TotalPages="totalPages" CurrentPage="currentPage" GoToPage="GoToPage" />
+        </div>
+    </div>
+    <ConfirmDialog @ref="confirmDialog" Title="Confirm!" Message="Are you sure you want to delete this record?"
+    ConfirmationResult="OnConfirmationResult" />
+    <Toast @ref="toaster" Title="Deleted!" Color="Green" Message="The record is deleted" />
+}
+
+@inject IOrderService service
+@inject IEncryptionService encryptor
+
+@code {
+    private int totalPages, pageSize = 10, currentPage = 1, currentSortColumn = 5, selectedItem;
+    private Status? filterOrderStatus;
+    private Toast? toaster;
+    private bool sortAscending = false, isLoading = false;
+    private ConfirmDialog? confirmDialog;
+    private PagedResult<RawMaterialOrderDTO>? data;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task GoToPage(int page)
+    {
+        if (page < 1) page = 1;
+        if (page > totalPages) page = totalPages;
+        currentPage = page;
+        await LoadData();
+    }
+
+    private async Task SortColumn(int columnId)
+    {
+        if (currentSortColumn == columnId)
+        {
+            sortAscending = !sortAscending;
+        }
+        else
+        {
+            currentSortColumn = columnId;
+            sortAscending = !sortAscending;
+        }
+
+        currentPage = 1;
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        if (isLoading) return;
+
+        isLoading = true;
+        try
+        {
+            if (currentSortColumn == 1 && sortAscending)
+                data = await service.GetPagedListAsync(currentPage, pageSize, (query => query.OrderBy(x => x.Id)), filterOrderStatus);
+            else if (currentSortColumn == 1 && !sortAscending)
+                data = await service.GetPagedListAsync(currentPage, pageSize, (query => query.OrderByDescending(x =>
+                x.Id)), filterOrderStatus);
+
+            else if (currentSortColumn == 2 && sortAscending)
+                data = await service.GetPagedListAsync(currentPage, pageSize, (query => query.OrderBy(x =>
+                x.SupplierName)), filterOrderStatus);
+            else if (currentSortColumn == 2 && !sortAscending)
+                data = await service.GetPagedListAsync(currentPage, pageSize, (query => query.OrderByDescending(x =>
+                x.SupplierName)), filterOrderStatus);
+
+            else if (currentSortColumn == 3 && sortAscending)
+                data = await service.GetPagedListAsync(currentPage, pageSize, (query => query.OrderBy(x =>
+                x.ExpectedDelivery)), filterOrderStatus);
+            else if (currentSortColumn == 3 && !sortAscending)
+                data = await service.GetPagedListAsync(currentPage, pageSize, (query => query.OrderByDescending(x =>
+                x.ExpectedDelivery)), filterOrderStatus);
+
+            else if (currentSortColumn == 4 && sortAscending)
+                data = await service.GetPagedListAsync(currentPage, pageSize, (query => query.OrderBy(x =>
+                x.TotalAmount)), filterOrderStatus);
+            else if (currentSortColumn == 4 && !sortAscending)
+                data = await service.GetPagedListAsync(currentPage, pageSize, (query => query.OrderByDescending(x =>
+                x.TotalAmount)), filterOrderStatus);
+
+            else if (currentSortColumn == 5 && sortAscending)
+                data = await service.GetPagedListAsync(currentPage, pageSize, (query => query.OrderBy(x =>
+                x.CreatedOn)), filterOrderStatus);
+            else if (currentSortColumn == 5 && !sortAscending)
+                data = await service.GetPagedListAsync(currentPage, pageSize, (query => query.OrderByDescending(x =>
+                x.CreatedOn)), filterOrderStatus);
+
+            totalPages = (data!.TotalCount + pageSize - 1) / pageSize;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ShowConfirmDialog(int id)
+    {
+        selectedItem = id;
+        confirmDialog!.Show();
+    }
+
+    private async void OnConfirmationResult(bool isConfirmed)
+    {
+        if (isConfirmed && selectedItem > 0)
+        {
+            if (await service.Delete(selectedItem))
+            {
+                toaster!.Show(seconds: 2);
+                await LoadData();
+                StateHasChanged();
+            }
+            selectedItem = 0; // Reset the selected item
+        }
+    }
+
+    private async Task FilterOrders(ChangeEventArgs e)
+    {
+        if (e.Value.ToString() != "0")
+        {
+            Status orderStatus;
+            Enum.TryParse(e.Value.ToString(), out orderStatus);
+            filterOrderStatus = orderStatus;
+            @* Console.WriteLine("FilterOrders is called, filterOrderStatus is: " + orderStatus); *@
+
+            // Call your method here
+            await LoadData();
+        }
+        else
+        {
+            filterOrderStatus = null;
+            await LoadData();
+        }
+    }
+}

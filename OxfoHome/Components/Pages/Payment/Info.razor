@@ -1,0 +1,159 @@
+﻿@page "/payment/info/{EntityId?}"
+
+@using OxfoHome.DAL
+@using OxfoHome.DAL.DTOs
+@using OxfoHome.DAL.Services
+
+<PageTitle>@(!string.IsNullOrWhiteSpace(EntityId) ? "Edit Payment - OxfoHome" : "Add Payment - OxfoHome")</PageTitle>
+
+<BackTo Link="/payment/list" Title="Back to manage payments" />
+
+@if (payeeList == null)
+{
+    <Loader />
+}
+else
+{
+    <div class="row mt-3">
+    <h3>@(!string.IsNullOrWhiteSpace(EntityId) ? "Edit Payment" : "Add Payment")</h3>
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <EditForm Model="entity" OnSubmit="OnSubmit" FormName="AddAccount">
+                    <div class="red">@errorMsg</div>
+                    <div class="form-card">
+                        <div class="row">
+                            <div class="form-group col-lg-6">
+                                <label for="from">Paid By</label>
+                                <SearchableSelect @bind-Value="entity.FromPayeeId" TItem="PayeeDTO" TValue="int?"
+                                    Items="@payeeList" TextPropertyName="Name" ValuePropertyName="Id" />
+                            </div>
+                            <div class="form-group col-lg-6">
+                                <label for="to">Paid To</label>
+                                <SearchableSelect @bind-Value="entity.ToPayeeId" TItem="PayeeDTO" TValue="int?"
+                                    Items="@payeeList" TextPropertyName="Name" ValuePropertyName="Id" />
+                            </div>
+                            <div class="form-group col-lg-6 mt-3">
+                                <label for="amount">Amount</label>
+                                <InputNumber @bind-Value="entity.Amount" class="form-control" id="amount" required />
+                            </div>
+
+                            <div class="form-group col-lg-6 mt-3">
+                                <label for="transaction-type">Transaction Type</label>
+                                <InputText @bind-Value="entity.TransactionType" class="form-control"
+                                    id="transaction-type" />
+                            </div>
+
+                            <div class="form-group col-lg-6 mt-3">
+                                <label for="attachment">Attachment</label><br>
+                                <InputFile OnChange="HandleFileSelected" /><br>
+                                <span class="hide">@entity.Attachment</span>
+                            </div>
+
+                            <div class="form-group col-lg-12 mt-3">
+                                <label for="notes">Notes</label>
+                                <MultilineInput @bind-Value="entity.Notes" class="form-control" id="notes" />
+                            </div>
+
+                            <div class="form-group col-lg-12 mt-3 d-flex justify-content-end">
+                                <button type="submit" class="btn btn-primary">
+                                    @(!string.IsNullOrWhiteSpace(EntityId) ? "Update Payment" : "Add Payment")
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+</div>
+}
+
+@inject IPaymentService service
+@inject IPayeeService payeeService
+@inject NavigationManager navigation
+@inject IEncryptionService encryptor
+
+@code {
+    [Parameter] public string? EntityId { get; set; }
+    private string errorMsg;
+    private IBrowserFile? file;
+    private PaymentDTO? entity { get; set; } = new();
+    private IQueryable<PayeeDTO> payeeList { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetPayeeList();
+        if (!string.IsNullOrWhiteSpace(EntityId))
+        {
+            try
+            {
+                int id = Convert.ToInt32(encryptor.Decrypt(EntityId));
+                entity = await service.GetByID(id);
+            }
+            catch (Exception ex) { throw ex; }
+        }
+    }
+
+    private async void OnSubmit(EditContext editContext)
+    {
+        try
+        {
+            errorMsg = "";
+            if (entity.FromPayeeId > 0 && entity.ToPayeeId > 0 && entity.Amount > 0)
+            {
+                //upload attachment if uploaded
+                if (file != null)
+                    await UploadAttachment();
+
+                if (!string.IsNullOrWhiteSpace(EntityId))
+                {
+                    // Update existing record
+                    bool isUpdated = await service.Update(entity);
+                    if (isUpdated)
+                        navigation.NavigateTo("/payment/list");
+                }
+                else
+                {
+                    // Get the current UTC time
+                    DateTime utcNow = DateTime.UtcNow;
+
+                    // Define the Pakistan Standard Time (PST) timezone
+                    TimeZoneInfo pakistanTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Karachi");
+
+                    // Convert UTC time to Pakistan time
+                    DateTime pakistanTime = TimeZoneInfo.ConvertTimeFromUtc(utcNow, pakistanTimeZone);
+
+                    // Add new record
+                    entity!.CreatedOn = pakistanTime;
+                    entity.Status = (int)Status.Active;
+                    bool isAdded = await service.Add(entity);
+                    if (isAdded)
+                        navigation.NavigateTo("/payment/list");
+                }
+            }
+            else
+                errorMsg = "Please select 'from' and 'to' payees";
+        }
+        catch (Exception ex) { throw ex; }
+    }
+
+    private async Task GetPayeeList()
+    {
+        payeeList = await payeeService.GetAll();
+    }
+
+    private void HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        file = e.File;
+        string randomString = Guid.NewGuid().ToString().Replace("-", "").Substring(0, 8);
+        entity.Attachment = randomString + file.Name.Replace(" ", "");
+    }
+
+    private async Task UploadAttachment()
+    {
+        var filePath = Path.Combine("wwwroot", "uploads/payment", entity.Attachment);
+        await using var fileStream = new FileStream(filePath, FileMode.Create);
+        await file.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024).CopyToAsync(fileStream);
+    }
+}

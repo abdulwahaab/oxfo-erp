@@ -1,0 +1,318 @@
+﻿@page "/payment/list"
+
+@using OxfoHome.DAL
+@using OxfoHome.DAL.DTOs
+@using OxfoHome.DAL.Services
+@using System.Linq.Expressions
+
+<PageTitle>Manage Payments - OxfoHome</PageTitle>
+
+<div class="row mt-3">
+    <div class="col-6">
+        <h3>Manage Payments</h3>
+    </div>
+    <div class="col-6">
+        <LinkButton Title="Add Payment" Link="/payment/info" />
+    </div>
+</div>
+@if (payeeList != null)
+{
+    <div class="row">
+    <div class="col-lg-2">
+        <label for="fromDate">From Date</label>
+        <InputDate id="fromDate" @bind-Value="@fromDate" Max="@(DateTime.Today.ToString("yyyy-MM-dd"))"
+            class="form-control" />
+    </div>
+    <div class="col-lg-2">
+        <label for="toDate">To Date</label>
+        <InputDate id="toDate" @bind-Value="@toDate" Max="@(DateTime.Today.ToString("yyyy-MM-dd"))"
+            class="form-control" />
+    </div>
+    <div class="col-lg-8">
+        <label>Select Payee</label>
+        <div class="row">
+            <div class="col-lg-5">
+                <SearchableSelect @ref="searchPayeeRef" @bind-Value="@payeeId" TItem="PayeeDTO" TValue="int?"
+                    Items="@payeeList" TextPropertyName="Name" ValuePropertyName="Id" />
+            </div>
+            <div class="col-lg-7">
+                <button class="btn btn-success me-2" type="button" @onclick="FilterData">Filter</button>
+                <button class="btn btn-info me-2" type="button" @onclick="ResetFilters">Reset</button>
+                @if (data != null && data.Items.Count() > 0)
+                    {
+                        <button @onclick="DownloadExcel" class="btn btn-warning">Download Excel</button>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+@if (data == null)
+{
+    <Loader />
+}
+else if (data.Items.Count() == 0)
+{
+    <div class="alert alert-primary text-center mt-3" role="alert">
+    No data found!
+</div>
+}
+else
+{
+    <div class="card mt-3">
+    <div class="card-body">
+
+        <table class="table table-striped table-hover dataGrid">
+            <thead>
+                <tr>
+                    <th class="sort col-md-2" @onclick="() => SortColumn(1)">Paid By <i
+                            class="material-icons">arrow_drop_down</i></th>
+                    <th class="sort col-md-2" @onclick="() => SortColumn(2)">Paid To <i
+                            class="material-icons">arrow_drop_down</i></th>
+                    <th class="sort col-md-2" @onclick="() => SortColumn(3)">
+                        Amount <i class="material-icons">arrow_drop_down</i>
+                    </th>
+                    <th class="sort col-md-2" @onclick="() => SortColumn(4)">
+                        Created On <i class="material-icons">arrow_drop_down</i>
+                    </th>
+                    <th class="col-md-2">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (isLoading)
+                    {
+                        <tr>
+                            <td colspan="5">
+                                <Loader />
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var item in data.Items)
+                        {
+                            string encryptedId = encryptor.Encrypt(item.Id.ToString());
+                            <tr>
+                                <td>@item.FromPayeeName</td>
+                                <td>@item.ToPayeeName</td>
+                                <td>@String.Format("{0:N0}", item.Amount)</td>
+                                <td>@item.CreatedOn.Value.ToString("dd/MM/yyyy hh:mm tt")</td>
+                                <td>
+                                    <a href="/payment/info/@encryptedId" class="no-underline">Edit</a> |
+                                    <a href="/payment/detail/@encryptedId" class="no-underline">Details</a> | <button
+                                        @onclick="() => ShowConfirmDialog(item.Id)" class="link red">Delete</button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+            <b>@data.TotalCount records</b>
+            <Pagination TotalPages="totalPages" CurrentPage="currentPage" GoToPage="GoToPage" />
+        </div>
+    </div>
+    <ConfirmDialog @ref="confirmDialog" Title="Confirm!" Message="Are you sure you want to delete this record?"
+    ConfirmationResult="OnConfirmationResult" />
+    <Toast @ref="toaster" Title="Deleted!" Color="Green" Message="The record is deleted" />
+
+    <script>
+    window.downloadFileFromStream = async (fileName, contentStreamReference) => {
+        const arrayBuffer = await contentStreamReference.arrayBuffer();
+        const blob = new Blob([arrayBuffer]);
+        const url = URL.createObjectURL(blob);
+        const anchorElement = document.createElement('a');
+        anchorElement.href = url;
+        anchorElement.download = fileName ?? '';
+        anchorElement.click();
+        anchorElement.remove();
+        URL.revokeObjectURL(url);
+    }
+</script>
+}
+
+@inject IJSRuntime JS
+@inject IPaymentService service
+@inject IExcelService excelService
+@inject IPayeeService payeeService
+@inject IEncryptionService encryptor
+
+@code {
+    private int totalPages, pageSize = 10, currentPage = 1, currentSortColumn = 4, selectedItem;
+    private int? payeeId;
+    private bool sortAscending = false, isLoading = false;
+    private string? searchQuery;
+    private Toast? toaster;
+    private DateTime? fromDate { get; set; }
+    private DateTime? toDate { get; set; }
+    private SearchableSelect<PayeeDTO, int?> searchPayeeRef;
+    private ConfirmDialog? confirmDialog;
+    private PagedResult<PaymentDTO>? data;
+    private IQueryable<PayeeDTO> payeeList;
+    Expression<Func<PaymentDTO, bool>>? dataFilter = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetPayeeList();
+        await LoadData();
+    }
+
+    private async Task GoToPage(int page)
+    {
+        if (page < 1) page = 1;
+        if (page > totalPages) page = totalPages;
+        currentPage = page;
+        await LoadData();
+    }
+
+    private async Task SortColumn(int columnId)
+    {
+        if (currentSortColumn == columnId)
+        {
+            sortAscending = !sortAscending;
+        }
+        else
+        {
+            currentSortColumn = columnId;
+            sortAscending = !sortAscending;
+        }
+
+        currentPage = 1;
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        if (isLoading) return;
+
+        isLoading = true;
+        try
+        {
+            if (currentSortColumn == 1 && sortAscending)
+                data = await service.GetPagedListAsync(currentPage, pageSize, (query => query.OrderBy(x => x.FromPayeeName)), filter:
+                dataFilter);
+            else if (currentSortColumn == 1 && !sortAscending)
+                data = await service.GetPagedListAsync(currentPage, pageSize, (query => query.OrderByDescending(x =>
+                x.FromPayeeName)), filter: dataFilter);
+
+            else if (currentSortColumn == 2 && sortAscending)
+                data = await service.GetPagedListAsync(currentPage, pageSize, (query => query.OrderBy(x => x.ToPayeeName)), filter:
+                dataFilter);
+            else if (currentSortColumn == 2 && !sortAscending)
+                data = await service.GetPagedListAsync(currentPage, pageSize, (query => query.OrderByDescending(x =>
+                x.ToPayeeName)), filter: dataFilter);
+
+            else if (currentSortColumn == 3 && sortAscending)
+                data = await service.GetPagedListAsync(currentPage, pageSize, (query => query.OrderBy(x => x.Amount)), filter:
+                dataFilter);
+            else if (currentSortColumn == 3 && !sortAscending)
+                data = await service.GetPagedListAsync(currentPage, pageSize, (query => query.OrderByDescending(x =>
+                x.Amount)), filter: dataFilter);
+
+            else if (currentSortColumn == 4 && sortAscending)
+                data = await service.GetPagedListAsync(currentPage, pageSize, (query => query.OrderBy(x => x.CreatedOn)), filter:
+                dataFilter);
+            else if (currentSortColumn == 4 && !sortAscending)
+                data = await service.GetPagedListAsync(currentPage, pageSize, (query => query.OrderByDescending(x =>
+                x.CreatedOn)), filter: dataFilter);
+
+            totalPages = (data!.TotalCount + pageSize - 1) / pageSize;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ShowConfirmDialog(int id)
+    {
+        selectedItem = id;
+        confirmDialog!.Show();
+    }
+
+    private async void OnConfirmationResult(bool isConfirmed)
+    {
+        if (isConfirmed && selectedItem > 0)
+        {
+            if (await service.Delete(selectedItem))
+            {
+                toaster!.Show(seconds: 2);
+                await LoadData();
+                StateHasChanged();
+            }
+            selectedItem = 0; // Reset the selected item
+        }
+    }
+
+    private async Task GetPayeeList()
+    {
+        payeeList = await payeeService.GetAll();
+    }
+
+    private async Task ResetFilters()
+    {
+        currentPage = 1;
+        payeeId = null;
+        fromDate = null;
+        toDate = null;
+        await searchPayeeRef.Clear();
+        dataFilter = null;
+        await LoadData();
+    }
+
+    private async Task DownloadExcel()
+    {
+        Expression<Func<PaymentDTO, bool>>? payeeFilter = null;
+
+        if (payeeId != null && payeeId > 0 && fromDate != null && toDate != null)
+            payeeFilter = (x => (x.FromPayeeId == payeeId || x.ToPayeeId == payeeId) && x.CreatedOn > fromDate && x.CreatedOn <
+            toDate);
+        else if (fromDate != null && toDate != null)
+            payeeFilter = (x => x.CreatedOn >= fromDate && x.CreatedOn <= toDate);
+        else if (payeeId != null && payeeId > 0)
+            payeeFilter = (x => x.FromPayeeId == payeeId || x.ToPayeeId == payeeId);
+
+        PagedResult<PaymentDTO> dataToExport = await service.GetPagedListAsync(0, 0, (query => query.OrderBy(x =>
+        x.CreatedOn)), filter: payeeFilter);
+
+        //select only the columns that need to be exported
+        var filteredList = dataToExport.Items.Select((x, index) => new
+        {
+            ID = index + 1,
+            x.FromPayeeName,
+            x.ToPayeeName,
+            x.Amount,
+            x.Notes,
+            x.CreatedOn
+        }).ToList();
+
+        // Generate the Excel file
+        var excelData = excelService.ExportToExcel(filteredList, "Payments");
+        var fileStream = new MemoryStream(excelData);
+        using var streamRef = new DotNetStreamReference(stream: fileStream);
+
+        // Save the file locally for debugging purposes
+        @* var filePath = Path.Combine("wwwroot", "uploads/payment", "SupplierPayments.xlsx");
+File.WriteAllBytes(filePath, excelData); *@
+
+        // Trigger file download
+        var fileName = "SupplierPayments.xlsx";
+        var mimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+        await JS.InvokeVoidAsync("downloadFileFromStream", fileName, streamRef);
+    }
+
+    private async Task FilterData()
+    {
+        currentPage = 1;
+
+        if (payeeId != null && payeeId > 0 && fromDate != null && toDate != null)
+            dataFilter = (x => (x.FromPayeeId == payeeId || x.ToPayeeId == payeeId) && x.CreatedOn > fromDate && x.CreatedOn <
+            toDate);
+        else if (fromDate != null && toDate != null)
+            dataFilter = (x => x.CreatedOn >= fromDate && x.CreatedOn <= toDate);
+        else if (payeeId != null && payeeId > 0)
+            dataFilter = (x => x.FromPayeeId == payeeId || x.ToPayeeId == payeeId);
+
+        await LoadData();
+    }
+}

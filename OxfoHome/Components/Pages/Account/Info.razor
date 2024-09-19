@@ -1,0 +1,119 @@
+﻿@page "/account/info/{EntityId?}"
+
+@using OxfoHome.DAL
+@using OxfoHome.DAL.DTOs
+@using OxfoHome.DAL.Services
+
+<PageTitle>@(!string.IsNullOrWhiteSpace(EntityId) ? "Edit Account - OxfoHome" : "Add Account - OxfoHome")</PageTitle>
+
+<BackTo Link="/account/list" Title="Back to manage accounts" />
+
+<div class="row mt-3">
+    <h3>@(!string.IsNullOrWhiteSpace(EntityId) ? "Edit Account" : "Add Account")</h3>
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <EditForm Model="entity" OnSubmit="OnSubmit" FormName="AddAccount">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+                    <div class="form-card">
+                        <div class="row">
+                            <div class="form-group col-lg-6">
+                                <label for="name">Account Name</label>
+                                <InputText @bind-Value="entity.AccountName" focus class="form-control" type="text"
+                                    id="name" required />
+                            </div>
+                            <div class="form-group col-lg-6">
+                                <label for="number">Account Number</label>
+                                <InputText @bind-Value="entity.AccountNumber" class="form-control" type="text"
+                                    id="number" required />
+                            </div>
+                            <div class="form-group col-lg-6 mt-3">
+                                <label for="balance">Current Balance</label>
+                                <InputNumber @bind-Value="entity.Balance" class="form-control" id="balance" required />
+                            </div>
+                            <div class="form-group col-lg-6 mt-3">
+                                <label for="bankname">Bank Name</label>
+                                <InputText @bind-Value="entity.BankName" class="form-control" type="text"
+                                    id="bankname" />
+                            </div>
+                            <div class="form-group col-lg-6 mt-3">
+                                <label for="accounttype">Account Type</label>
+                                <InputText @bind-Value="entity.AccountType" class="form-control" type="text"
+                                    id="accounttype" />
+                            </div>
+                            <div class="form-group col-lg-12 mt-3">
+                                <label for="notes">Notes</label>
+                                <MultilineInput @bind-Value="entity.Notes" class="form-control" id="notes" />
+                            </div>
+
+                            <div class="form-group col-lg-12 mt-3 d-flex justify-content-end">
+                                <button type="submit" class="btn btn-primary">
+                                    @(!string.IsNullOrWhiteSpace(EntityId) ? "Update Account" : "Add Account")
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+</div>
+
+@inject IAccountService service
+@inject NavigationManager navigation
+@inject IEncryptionService encryptor
+
+@code {
+    [Parameter] public string? EntityId { get; set; }
+    private AccountDTO? entity { get; set; } = new AccountDTO();
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(EntityId))
+        {
+            try
+            {
+                int id = Convert.ToInt32(encryptor.Decrypt(EntityId));
+                entity = await service.GetByID(id);
+                if (entity == null)
+                {
+                    //show invalid URL error via toaster
+                }
+            }
+            catch (Exception ex) { throw ex; }
+        }
+        else entity = new AccountDTO();
+    }
+
+
+    private async void OnSubmit(EditContext editContext)
+    {
+        try
+        {
+            if (editContext!.Validate())
+            {
+                if (!string.IsNullOrWhiteSpace(EntityId))
+                {
+                    // Update existing customer
+                    bool isUpdated = await service.Update(entity);
+                    if (isUpdated)
+                    {
+                        navigation.NavigateTo("/account/list");
+                    }
+                }
+                else
+                {
+                    // Add new customer
+                    entity!.CreatedOn = DateTime.Now;
+                    entity.Status = (int)Status.Active;
+                    bool isAdded = await service.Add(entity);
+                    if (isAdded)
+                    {
+                        navigation.NavigateTo("/account/list");
+                    }
+                }
+            }
+        }
+        catch (Exception ex) { throw ex; }
+    }
+}

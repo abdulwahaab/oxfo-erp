@@ -1,0 +1,162 @@
+﻿@page "/raw-material/order/info/{EntityId?}"
+
+@using OxfoHome.DAL
+@using OxfoHome.DAL.DTOs
+@using OxfoHome.DAL.Services
+
+<PageTitle>@(!string.IsNullOrWhiteSpace(EntityId) ? "Edit Raw Material Order - OxfoHome" : "Create Raw Material Order - OxfoHome")
+</PageTitle>
+
+<BackTo Link="/raw-material/order/list" Title="Back to raw material orders" />
+
+@if(suppliers != null && rawMaterials != null)
+{
+<div class="row mt-3">
+    <h3>@(!string.IsNullOrWhiteSpace(EntityId) ? "Edit Raw Material Order" : "Create Raw Material Order")</h3>
+    <div class="col-md-9">
+        <div class="card">
+            <div class="card-body">
+                <EditForm Model="entity" OnSubmit="OnSubmit">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+                    <div class="red">@errorMsg</div>
+                    <div class="form-card">
+                        <div class="row">
+                            <div class="form-group col-lg-6 mt-3">
+                                <label for="name">Select Supplier</label>
+                               <SearchableSelect @bind-Value="entity.SupplierId" TItem="SupplierDTO" TValue="int" Items="@suppliers" TextPropertyName="Name" ValuePropertyName="Id" />
+                            </div>
+                            <div class="form-group col-lg-6 mt-3">
+                                <label for="date">Expected Delivery Date</label>
+                                        <InputDate id="date" @bind-Value="entity.ExpectedDelivery" class="form-control" />
+                            </div>
+                            <div class="form-group mt-3">
+                                <label>Select Items to Order</label>
+                                <table class="table table-hover">
+                                    <thead>
+                                        <th></th>
+                                        <th>Item Name</th>
+                                        <th>Item Number</th>
+                                        <th>Price Unit</th>
+                                        <th>Price Per Unit</th>
+                                        <th>Quantity (Bags/Kilograms)</th>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var item in rawMaterials)
+                                        {
+                                            <OrderItem CurrentItemData="@item" SelectedItems="@orderItems" />
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="form-group col-lg-12 mt-3 d-flex justify-content-end">
+                                <button type="submit" class="btn btn-primary">
+                                    @(!string.IsNullOrWhiteSpace(EntityId) ? "Update Order" : "Create Order")
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+</div>
+<Toast @ref="toaster" Title="Error!" Color="Red" Message="An error occurred, please try again." />
+}
+else{
+    <Loader />
+}
+@inject IOrderService orderService
+@inject NavigationManager Navigation
+@inject IEncryptionService encryptor
+@inject IRawMaterialService rmService
+@inject ISupplierService supplierService
+
+@code {  
+    [Parameter] public string? EntityId { get; set; }
+    private Toast? toaster;
+    private string errorMsg;
+    private IQueryable<SupplierDTO> suppliers { get; set; }
+    private RawMaterialOrderDTO? entity { get; set; } = new();
+    private IQueryable<RawMaterialDTO> rawMaterials { get; set; }
+
+    private List<RawMaterialOrderDetailDTO> orderItems = new List<RawMaterialOrderDetailDTO>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetSupplierList();
+        await GetRawMaterialList();
+        if (!string.IsNullOrWhiteSpace(EntityId))
+        {
+            try
+            {
+                int id = Convert.ToInt32(encryptor.Decrypt(EntityId));
+                entity = await orderService.GetByID(id);
+                if (entity != null)
+                {
+                    orderItems = await orderService.GetOrderItemsByOrderID(entity.Id);
+                }
+            }
+            catch (Exception ex) { throw ex; }
+        }
+    }
+
+    private async void OnSubmit(EditContext editContext)
+    {
+        try
+        {
+            errorMsg = "";
+            if(entity.SupplierId > 0 && editContext.Validate()){
+                if(ValidateOrderItems())
+                {
+                    bool orderSubmitted;
+
+                    entity.TotalAmount = orderItems.Sum(item => item.PricePerItem * item.QuantityOrdered);
+                    if(!string.IsNullOrWhiteSpace(EntityId)) { //update the existing order
+                        orderSubmitted = await orderService.UpdateOrder(entity, orderItems);
+                    }
+                    else { // create new order
+                        entity.CreatedOn = DateTime.Now;
+                        entity.Status = (int)Status.Pending;
+                        orderSubmitted = await orderService.CreateOrder(entity, orderItems);
+                    }
+                    
+                    if(orderSubmitted){
+                        Navigation.NavigateTo("/raw-material/order/list");
+                    }
+                    else{
+                        toaster!.Show(seconds: 3);
+                    }
+                }
+                else {
+                    errorMsg = "Please select order items. Also provide price and quantity.";
+                }
+            }
+            else if (entity.SupplierId == null || entity.SupplierId <= 0){
+                errorMsg = "Please select a supplier";
+            }
+        }
+        catch (Exception ex){throw ex;}
+    }
+
+    private bool ValidateOrderItems(){
+        if(orderItems.Count > 0)
+        {
+            foreach(var item in orderItems)
+            {
+                if(item.PricePerItem == null || item.QuantityOrdered == null || item.PricePerItem <= 0 || item.QuantityOrdered <= 0)
+                    return false;
+            }
+            return true;
+        }
+        else return false;
+    }
+
+    private async Task GetSupplierList(){
+        suppliers = await supplierService.GetAll();
+    }
+
+    private async Task GetRawMaterialList(){
+        rawMaterials = await rmService.GetAll();
+    }
+}

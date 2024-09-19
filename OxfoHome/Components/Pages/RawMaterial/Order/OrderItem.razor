@@ -1,0 +1,100 @@
+@using OxfoHome.DAL.DTOs
+
+<tr>
+    @* <td>
+    @CurrentItem.RawMaterialId
+    </td> *@
+    <td>
+        <input type="checkbox" id="@CurrentItemData.Id" @bind="IsSelected" @bind:after="OnCheckboxChanged"
+            style="transform: scale(1.7);" />
+    </td>
+    <td>
+        <label class="font-normal" for="@CurrentItemData.Id">
+            @CurrentItemData.ItemName
+        </label>
+    </td>
+    <td>
+        <label class="font-normal" for="@CurrentItemData.Id">
+            @CurrentItemData.ItemNumber
+        </label>
+    </td>
+    <td>
+        <select @bind="CurrentItem.PriceUnit" @bind:after="TriggerUpdate" class="form-select p-1">
+            <option value="PerBag">Per Bag</option>
+            <option value="PerKilogram">Per Kilogram</option>
+        </select>
+    </td>
+    <td>
+        <input type="number" @bind="CurrentItem.PricePerItem" @bind:after="TriggerUpdate" placeholder="Price per unit"
+            class="form-control p-1" min="0" />
+    </td>
+    <td>
+        <input type="number" @bind="CurrentItem.QuantityOrdered" @bind:after="TriggerUpdate" placeholder="Quantity"
+            class="form-control p-1" min="0" />
+    </td>
+</tr>
+
+@code {
+    [Parameter] public RawMaterialDTO CurrentItemData { get; set; }
+    [Parameter] public List<RawMaterialOrderDetailDTO> SelectedItems { get; set; }
+
+    private RawMaterialOrderDetailDTO CurrentItem { get; set; }
+    private bool IsSelected { get; set; }
+
+    protected override void OnInitialized()
+    {
+        CurrentItem = new RawMaterialOrderDetailDTO
+            {
+                RawMaterialId = CurrentItemData.Id,
+                PriceUnit = "PerBag" // Default value, you can change it as needed
+            };
+
+        // Check if the current item is already in the SelectedItems list and set the checkbox accordingly
+        var existingItem = SelectedItems.FirstOrDefault(item => item.RawMaterialId == CurrentItem.RawMaterialId);
+        if (existingItem != null)
+        {
+            CurrentItem = existingItem;
+            IsSelected = true;
+        }
+        else
+        {
+            IsSelected = false;
+        }
+    }
+
+    private void OnCheckboxChanged()
+    {
+        if (IsSelected)
+        {
+            // Add item to the list if it's not already there
+            if (!SelectedItems.Any(item => item.RawMaterialId == CurrentItem.RawMaterialId))
+            {
+                SelectedItems.Add(CurrentItem);
+            }
+        }
+        else
+        {
+            // Remove item from the list if it's unchecked
+            var itemToRemove = SelectedItems.FirstOrDefault(item => item.RawMaterialId == CurrentItem.RawMaterialId);
+            if (itemToRemove != null)
+            {
+                SelectedItems.Remove(itemToRemove);
+            }
+        }
+    }
+
+    private async Task TriggerUpdate()
+    {
+        if (IsSelected)
+        {
+            // Update the item in the list
+            var existingItem = SelectedItems.FirstOrDefault(item => item.RawMaterialId == CurrentItem.RawMaterialId);
+            if (existingItem != null)
+            {
+                existingItem.QuantityOrdered = CurrentItem.QuantityOrdered;
+                existingItem.PricePerItem = CurrentItem.PricePerItem;
+                existingItem.PriceUnit = CurrentItem.PriceUnit;
+            }
+        }
+    }
+}

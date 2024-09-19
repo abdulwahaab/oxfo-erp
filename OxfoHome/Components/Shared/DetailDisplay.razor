@@ -1,0 +1,55 @@
+﻿@typeparam T
+
+@using OxfoHome.DAL
+@using System.Reflection
+@using System.ComponentModel
+
+<div class="card">
+    <div class="card-body">
+        @if (Data != null)
+        {
+            var properties = Data.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(prop => prop.GetCustomAttribute<IgnoreDisplay>() == null);
+            <table class="table table-hover">
+                <tbody>
+                    @foreach (var prop in properties)
+                    {
+                        var displayName = prop.GetCustomAttribute<DisplayNameAttribute>()?.DisplayName ?? prop.Name;
+                        <tr>
+                            <td class="col-md-3"><b>@displayName: </b></td>
+                            @if (displayName.ToLower() == "status")
+                            {
+                                <td>@Enum.GetName(typeof(Status), (byte)prop.GetValue(Data))</td>
+                            }
+                            else
+                            {
+                                <td>
+                                    @if (prop.GetValue(Data) != null)
+                                    {
+
+                                        @((MarkupString)prop.GetValue(Data)?.ToString())
+                                    }
+                                    else
+                                    {
+                                        <span class="red">n/a</span>
+                                    }
+                                </td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        else
+        {
+            <div class="alert alert-primary text-center" role="alert">
+                No data found!
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public T Data { get; set; }
+}

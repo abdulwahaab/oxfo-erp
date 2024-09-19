@@ -1,0 +1,56 @@
+﻿<nav aria-label="navigation">
+    <ul class="pagination justify-content-end">
+        <li class="page-item @(CurrentPage == 1 ? "disabled" : "")">
+            <button class="page-link" @onclick="() => GoToPageAsync(CurrentPage - 1)">Previous</button>
+        </li>
+        @{
+            // Define the range of pages to show
+            int startPage = Math.Max(CurrentPage - 1, 1); // Show pages starting from (CurrentPage - 1)
+            int endPage = Math.Min(CurrentPage + 1, TotalPages); // Show pages ending at (CurrentPage + 1)
+
+            // If there are less than 3 pages available, adjust the start and end page
+            if (endPage - startPage < 2)
+            {
+                if (startPage == 1)
+                {
+                    endPage = Math.Min(startPage + 2, TotalPages);
+                }
+                else if (endPage == TotalPages)
+                {
+                    startPage = Math.Max(endPage - 2, 1);
+                }
+            }
+        }
+        @for (int i = startPage; i <= endPage; i++)
+        {
+            int pageNumber = i;
+            <li class="page-item @(CurrentPage == pageNumber ? "active" : "")">
+                <button class="page-link" @onclick="() => GoToPageAsync(pageNumber)">@pageNumber</button>
+            </li>
+        }
+
+        @if (endPage < TotalPages)
+        {
+            <li class="page-item disabled">
+                <span class="page-link">...</span>
+            </li>
+        }
+        <li class="page-item @(CurrentPage == TotalPages ? "disabled" : "")">
+            <button class="page-link" @onclick="() => GoToPageAsync(CurrentPage + 1)">Next</button>
+        </li>
+    </ul>
+</nav>
+
+@code {
+    [Parameter] public int CurrentPage { get; set; }
+    [Parameter] public int TotalPages { get; set; }
+    [Parameter] public EventCallback<int> GoToPage { get; set; }
+
+    private async Task GoToPageAsync(int pageNumber)
+    {
+        if (pageNumber != CurrentPage && pageNumber > 0 && pageNumber <= TotalPages)
+        {
+            await GoToPage.InvokeAsync(pageNumber);
+        }
+    }
+}
