@@ -1,0 +1,64 @@
+# .NET Core/ASP.NET Core
+bin/
+obj/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# VS Code
+.vscode/
+.vscode/*
+
+# Rider
+.idea/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows image file caches
+Thumbs.db
+ehthumbs.db
+
+# Folder config file
+Desktop.ini
+
+# Recycle Bin used on file shares
+$RECYCLE.BIN/
+
+# GitHub token settings
+.github/
+
+# Ignore app secrets
+secrets.json
+
+# User-specific files
+*.rsuser
+*.userprefs
+
+# Rider
+.idea/
+.idea/*
+
+# NuGet
+*.nupkg
+*.snupkg
+project.assets.json
+project.nuget.cache
+project.nuget.dgspec.json
+.nuget/
+
+# Environment variables
+.env
+.env.*
+
+# Logs
+*.log
